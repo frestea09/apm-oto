@@ -15,6 +15,23 @@ def _get_env_key(section: str, option: str) -> str:
     return f"{section}_{option}".upper().replace(" ", "_")
 
 
+def _read_optional(
+    parser: ConfigParser,
+    section: str,
+    option: str,
+    env_key: Optional[str] = None,
+) -> Optional[str]:
+    """Mengambil nilai dari environment atau berkas konfigurasi jika tersedia."""
+
+    key = env_key or _get_env_key(section, option)
+    env_value = os.getenv(key)
+    if env_value is not None:
+        return env_value
+    if parser.has_section(section) and parser.has_option(section, option):
+        return parser.get(section, option)
+    return None
+
+
 def _read_value(
     parser: ConfigParser,
     section: str,
@@ -22,12 +39,9 @@ def _read_value(
     fallback: Optional[str] = None,
     env_key: Optional[str] = None,
 ) -> str:
-    key = env_key or _get_env_key(section, option)
-    env_value = os.getenv(key)
-    if env_value is not None:
-        return env_value
-    if parser.has_option(section, option):
-        return parser.get(section, option)
+    value = _read_optional(parser, section, option, env_key=env_key)
+    if value is not None:
+        return value
     if fallback is None:
         raise KeyError(f"Konfigurasi '{section}.{option}' tidak ditemukan dan tidak memiliki default")
     return fallback
@@ -40,9 +54,7 @@ def _read_int(
     fallback: Optional[int] = None,
     env_key: Optional[str] = None,
 ) -> int:
-    value = _read_value(parser, section, option, fallback=None, env_key=env_key) if (
-        parser.has_option(section, option) or os.getenv((env_key or _get_env_key(section, option))) is not None
-    ) else None
+    value = _read_optional(parser, section, option, env_key=env_key)
     if value is None:
         if fallback is None:
             raise KeyError(f"Konfigurasi integer '{section}.{option}' tidak ditemukan dan tidak memiliki default")
@@ -57,9 +69,7 @@ def _read_float(
     fallback: Optional[float] = None,
     env_key: Optional[str] = None,
 ) -> float:
-    value = _read_value(parser, section, option, fallback=None, env_key=env_key) if (
-        parser.has_option(section, option) or os.getenv((env_key or _get_env_key(section, option))) is not None
-    ) else None
+    value = _read_optional(parser, section, option, env_key=env_key)
     if value is None:
         if fallback is None:
             raise KeyError(f"Konfigurasi float '{section}.{option}' tidak ditemukan dan tidak memiliki default")

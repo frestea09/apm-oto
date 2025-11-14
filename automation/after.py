@@ -19,7 +19,11 @@ class AfterClient:
     settings: ApplicationSettings
 
     def launch(self) -> None:
-        utils.launch_application(self.settings.path, self.settings.launch_delay)
+        utils.launch_application(
+            self.settings.path,
+            self.settings.launch_delay,
+            self.settings.working_dir,
+        )
         utils.ensure_window_focus(self.settings.window_title)
 
     def login(self) -> None:

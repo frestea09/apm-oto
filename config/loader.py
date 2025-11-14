@@ -87,6 +87,7 @@ class ApplicationSettings:
     window_title: str
     launch_delay: float
     submit_key: str
+    working_dir: str | None = None
 
 
 @dataclass
@@ -116,8 +117,9 @@ def load_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Settings:
     if path.exists():
         parser.read(path)
 
+    frista_path = _read_value(parser, "Frista", "path", fallback=r"D:\\BPJS\\Frista\\Frista.exe")
     frista_settings = ApplicationSettings(
-        path=_read_value(parser, "Frista", "path", fallback=r"D:\\BPJS\\Frista\\Frista.exe"),
+        path=frista_path,
         username=_read_value(parser, "Frista", "username", fallback=""),
         password=_read_value(
             parser,
@@ -134,20 +136,25 @@ def load_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Settings:
         ),
         launch_delay=_read_float(parser, "Frista", "launch_delay", fallback=5.0),
         submit_key=_read_value(parser, "Frista", "submit_key", fallback="space"),
+        working_dir=_read_optional(parser, "Frista", "working_dir")
+        or str(Path(frista_path).parent),
     )
 
+    after_path = _read_value(
+        parser,
+        "After",
+        "path",
+        fallback=r"C:\\Program Files (x86)\\BPJS Kesehatan\\Aplikasi Sidik Jari BPJS Kesehatan\\After.exe",
+    )
     after_settings = ApplicationSettings(
-        path=_read_value(
-            parser,
-            "After",
-            "path",
-            fallback=r"C:\\Program Files (x86)\\BPJS Kesehatan\\Aplikasi Sidik Jari BPJS Kesehatan\\After.exe",
-        ),
+        path=after_path,
         username=_read_value(parser, "After", "username", fallback=""),
         password=_read_value(parser, "After", "password", fallback="", env_key="AFTER_PASSWORD"),
         window_title=_read_value(parser, "After", "window_title", fallback="After"),
         launch_delay=_read_float(parser, "After", "launch_delay", fallback=7.0),
         submit_key=_read_value(parser, "After", "submit_key", fallback="enter"),
+        working_dir=_read_optional(parser, "After", "working_dir")
+        or str(Path(after_path).parent),
     )
 
     camera_settings = CameraSettings(

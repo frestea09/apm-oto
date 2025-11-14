@@ -42,7 +42,7 @@ Semua konfigurasi dasar berada di `config.conf`. Anda dapat mengubah lokasi exec
 - `FRISTA_PASSWORD`
 - `AFTER_PASSWORD`
 
-Pastikan jalur executable (`path`) sesuai dengan lokasi instalasi Frista dan After di mesin Anda. Contoh konfigurasi dapat dilihat di bagian `[Frista]` dan `[After]` pada berkas.
+Pastikan jalur executable (`path`) sesuai dengan lokasi instalasi Frista dan After di mesin Anda. Jika aplikasi membutuhkan direktori kerja tertentu agar dapat berjalan (misalnya Frista berada di `D:\BPJS\Frista`), atur juga nilai `working_dir`. Contoh konfigurasi dapat dilihat di bagian `[Frista]` dan `[After]` pada berkas.
 
 ## Menjalankan Aplikasi
 

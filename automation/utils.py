@@ -11,13 +11,25 @@ except ImportError:  # pragma: no cover - optional dependency
     gw = None  # type: ignore
 
 
-def launch_application(executable_path: str, delay: float) -> None:
+def launch_application(executable_path: str, delay: float, working_dir: str | None = None) -> None:
     """Launch an external application and wait for a fixed delay."""
+
     path = os.path.expandvars(executable_path)
     if not Path(path).exists():
         raise FileNotFoundError(f"File aplikasi tidak ditemukan: {path}")
 
-    os.startfile(path)
+    if working_dir:
+        expanded_dir = Path(os.path.expandvars(working_dir))
+        cwd = expanded_dir if expanded_dir.exists() else Path(path).parent
+    else:
+        cwd = Path(path).parent
+    try:
+        import subprocess
+
+        subprocess.Popen([path], cwd=str(cwd))
+    except Exception:
+        # Fallback ke startfile jika Popen gagal (misalnya pada beberapa versi Windows)
+        os.startfile(path)
     if delay > 0:
         time.sleep(delay)
 

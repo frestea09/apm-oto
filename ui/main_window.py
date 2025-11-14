@@ -20,6 +20,10 @@ class MainWindow:
         self.status_var = tk.StringVar(value="Silakan mulai dengan login Frista.")
         self.bpjs_var = tk.StringVar()
 
+        self._latest_state: Dict[str, bool] = {"frista_ready": False, "after_ready": False}
+        self._frista_busy = False
+        self._after_busy = False
+
         self._build_layout()
         self._register_callbacks()
         self._update_button_states({"frista_ready": False, "after_ready": False})
@@ -148,11 +152,13 @@ class MainWindow:
 
     # Event handlers ---------------------------------------------------
     def _on_login_frista(self) -> None:
+        self._frista_busy = True
         self.btn_frista.config(state="disabled")
         self.btn_frista_retry.config(state="disabled")
         self.controller.login_frista_async()
 
     def _on_login_after(self) -> None:
+        self._after_busy = True
         self.btn_after.config(state="disabled")
         self.btn_after_retry.config(state="disabled")
         self.controller.login_after_async()
@@ -172,6 +178,8 @@ class MainWindow:
     def _on_reset(self) -> None:
         self.bpjs_var.set("")
         self.entry_bpjs.delete(0, tk.END)
+        self._frista_busy = False
+        self._after_busy = False
         self.controller.reset()
 
     # Callback handlers ------------------------------------------------
@@ -179,15 +187,22 @@ class MainWindow:
         self.root.after(0, lambda: self.status_var.set(message))
 
     def _update_button_states(self, state: Dict[str, bool]) -> None:
-        def apply_state() -> None:
-            frista_ready = state.get("frista_ready", False)
-            after_ready = state.get("after_ready", False)
+        self._latest_state = dict(state)
 
-            frista_button_state = "disabled" if frista_ready else "normal"
+        def apply_state() -> None:
+            frista_ready = self._latest_state.get("frista_ready", False)
+            after_ready = self._latest_state.get("after_ready", False)
+
+            frista_button_state = "disabled" if self._frista_busy else "normal"
             self.btn_frista.config(state=frista_button_state)
             self.btn_frista_retry.config(state=frista_button_state)
 
-            after_button_state = "normal" if frista_ready and not after_ready else "disabled"
+            if self._after_busy:
+                after_button_state = "disabled"
+            elif frista_ready:
+                after_button_state = "normal"
+            else:
+                after_button_state = "disabled"
             self.btn_after.config(state=after_button_state)
             self.btn_after_retry.config(state=after_button_state)
 
@@ -207,17 +222,24 @@ class MainWindow:
 
     def _handle_action_result(self, action: str, success: bool) -> None:
         def update_controls() -> None:
-            if action == "frista_login" and not success:
-                self.btn_frista.config(state="normal")
-                self.btn_frista_retry.config(state="normal")
-            elif action == "after_login" and not success:
-                if self.controller.is_frista_ready:
+            if action == "frista_login":
+                self._frista_busy = False
+                if not success:
+                    self.btn_frista.config(state="normal")
+                    self.btn_frista_retry.config(state="normal")
+            elif action == "after_login":
+                self._after_busy = False
+                if not success and self.controller.is_frista_ready:
                     self.btn_after.config(state="normal")
                     self.btn_after_retry.config(state="normal")
             elif action == "submit_booking":
                 self.btn_submit.config(state="normal")
                 if success:
                     messagebox.showinfo("Berhasil", "Nomor BPJS berhasil dikirim ke Frista dan After.")
+
+            if action in {"frista_login", "after_login"}:
+                self._update_button_states(self._latest_state)
+
         self.root.after(0, update_controls)
 
 

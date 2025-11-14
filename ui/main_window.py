@@ -133,8 +133,8 @@ class MainWindow:
         status_label = tk.Label(status_frame, textvariable=self.status_var, wraplength=460, justify="left")
         status_label.pack(anchor="w")
 
-        control_frame = tk.Frame(self.root, padx=20, pady=(0, 16))
-        control_frame.pack(fill="x")
+        control_frame = tk.Frame(self.root, padx=20, pady=16)
+        control_frame.pack(fill="x", pady=(0, 16))
 
         self.btn_reset = tk.Button(control_frame, text="Reset Alur", command=self._on_reset)
         self.btn_reset.pack(side="left")

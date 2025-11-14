@@ -7,6 +7,7 @@ from typing import Callable, Dict
 
 from automation.after import AfterClient
 from automation.frista import FristaClient
+from automation.utils import NetworkUnavailableError, ensure_internet_connection
 from config.loader import WorkflowSettings
 
 StatusCallback = Callable[[str], None]
@@ -80,8 +81,17 @@ class SessionController:
     def _login_frista_task(self) -> None:
         self._update_status("Membuka aplikasi Frista...")
         try:
+            self._ensure_network_connection()
             self.frista.launch()
             self.frista.login()
+        except NetworkUnavailableError as exc:
+            self._handle_error(str(exc))
+            self._emit_action("frista_login", False)
+            return
+        except FileNotFoundError as exc:
+            self._handle_error(f"File aplikasi Frista tidak ditemukan: {exc}")
+            self._emit_action("frista_login", False)
+            return
         except Exception as exc:  # pragma: no cover - runtime interaction
             self._handle_error(f"Gagal login Frista: {exc}")
             self._emit_action("frista_login", False)
@@ -101,8 +111,17 @@ class SessionController:
 
         self._update_status("Membuka aplikasi After...")
         try:
+            self._ensure_network_connection()
             self.after.launch()
             self.after.login()
+        except NetworkUnavailableError as exc:
+            self._handle_error(str(exc))
+            self._emit_action("after_login", False)
+            return
+        except FileNotFoundError as exc:
+            self._handle_error(f"File aplikasi After tidak ditemukan: {exc}")
+            self._emit_action("after_login", False)
+            return
         except Exception as exc:  # pragma: no cover - runtime interaction
             self._handle_error(f"Gagal login After: {exc}")
             self._emit_action("after_login", False)
@@ -122,9 +141,14 @@ class SessionController:
 
         self._update_status("Mengirim nomor BPJS ke Frista dan After...")
         try:
+            self._ensure_network_connection()
             self.frista.enter_booking(booking_number)
             time.sleep(self.workflow.post_login_delay)
             self.after.enter_booking(booking_number)
+        except NetworkUnavailableError as exc:
+            self._handle_error(str(exc))
+            self._emit_action("submit_booking", False)
+            return
         except Exception as exc:  # pragma: no cover - runtime interaction
             self._handle_error(f"Gagal mengirim nomor BPJS: {exc}")
             self._emit_action("submit_booking", False)
@@ -146,6 +170,9 @@ class SessionController:
 
     def _emit_action(self, action: str, success: bool) -> None:
         self._action_callback(action, success)
+
+    def _ensure_network_connection(self) -> None:
+        ensure_internet_connection(self.workflow.network_timeout)
 
     # Read-only properties -------------------------------------------
     @property

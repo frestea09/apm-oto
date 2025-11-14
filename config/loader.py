@@ -99,6 +99,7 @@ class CameraSettings:
 @dataclass
 class WorkflowSettings:
     post_login_delay: float
+    network_timeout: float
 
 
 @dataclass
@@ -163,7 +164,8 @@ def load_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Settings:
     )
 
     workflow_settings = WorkflowSettings(
-        post_login_delay=_read_float(parser, "Workflow", "post_login_delay", fallback=1.0)
+        post_login_delay=_read_float(parser, "Workflow", "post_login_delay", fallback=1.0),
+        network_timeout=_read_float(parser, "Workflow", "network_timeout", fallback=5.0),
     )
 
     return Settings(

@@ -2,13 +2,32 @@
 from __future__ import annotations
 
 import os
+import socket
 import time
 from pathlib import Path
+
+from contextlib import closing
 
 try:
     import pygetwindow as gw  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     gw = None  # type: ignore
+
+
+class NetworkUnavailableError(ConnectionError):
+    """Error raised when the required network connection is unavailable."""
+
+
+def ensure_internet_connection(timeout: float = 5.0) -> None:
+    """Validate that an outbound internet connection is available."""
+
+    try:
+        with closing(socket.create_connection(("8.8.8.8", 53), timeout=timeout)):
+            return
+    except OSError as exc:  # pragma: no cover - relies on external connectivity
+        raise NetworkUnavailableError(
+            "Tidak ada koneksi internet. Periksa jaringan dan coba lagi."
+        ) from exc
 
 
 def launch_application(executable_path: str, delay: float, working_dir: str | None = None) -> None:
@@ -75,4 +94,11 @@ def dismiss_popup(key: str, delay: float = 0.2) -> None:
         time.sleep(delay)
 
 
-__all__ = ["launch_application", "focus_window", "ensure_window_focus", "dismiss_popup"]
+__all__ = [
+    "NetworkUnavailableError",
+    "ensure_internet_connection",
+    "launch_application",
+    "focus_window",
+    "ensure_window_focus",
+    "dismiss_popup",
+]

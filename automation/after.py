@@ -28,10 +28,20 @@ class AfterClient:
 
     def login(self) -> None:
         utils.ensure_window_focus(self.settings.window_title)
+
+        # Pastikan fokus berada pada input username sebelum mengetik.
+        for _ in range(3):
+            pyautogui.hotkey("shift", "tab")
+            time.sleep(0.05)
+
+        pyautogui.hotkey("ctrl", "a")
         pyautogui.write(self.settings.username)
         pyautogui.press("tab")
+
+        pyautogui.hotkey("ctrl", "a")
         pyautogui.write(self.settings.password)
         pyautogui.press("tab")
+
         pyautogui.press(self.settings.submit_key or "enter")
         time.sleep(1)
 

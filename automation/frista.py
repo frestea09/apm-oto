@@ -64,5 +64,13 @@ class FristaClient:
                 "Tidak dapat meminimalkan jendela Frista. Pastikan Frista sedang berjalan."
             )
 
+    def close(self) -> None:
+        """Close the Frista window entirely."""
+
+        if not utils.close_window(self.settings.window_title):
+            raise RuntimeError(
+                "Tidak dapat menutup jendela Frista. Pastikan aplikasinya sedang terbuka."
+            )
+
 
 __all__ = ["FristaClient"]

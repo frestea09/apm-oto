@@ -73,6 +73,14 @@ class SessionController:
         thread = threading.Thread(target=self._finish_frista_task, daemon=True)
         thread.start()
 
+    def hide_frista_async(self) -> None:
+        thread = threading.Thread(target=self._hide_frista_task, daemon=True)
+        thread.start()
+
+    def close_frista_async(self) -> None:
+        thread = threading.Thread(target=self._close_frista_task, daemon=True)
+        thread.start()
+
     def reset(self) -> None:
         with self._lock:
             self.frista_ready = False
@@ -188,6 +196,43 @@ class SessionController:
 
         self._update_status("Frista diminimalkan. Lanjutkan proses di aplikasi utama.")
         self._emit_action("frista_focus", True)
+
+    def _hide_frista_task(self) -> None:
+        if not self.frista_ready:
+            self._handle_error("Frista belum siap atau belum dibuka.")
+            self._emit_action("frista_hide", False)
+            return
+
+        self._update_status("Meminimalkan Frista sesuai permintaan operator...")
+        try:
+            self.frista.minimize()
+        except Exception as exc:  # pragma: no cover - runtime interaction
+            self._handle_error(f"Gagal meminimalkan Frista: {exc}")
+            self._emit_action("frista_hide", False)
+            return
+
+        self._update_status("Frista disembunyikan. Aplikasi utama kini berada di depan.")
+        self._emit_action("frista_hide", True)
+
+    def _close_frista_task(self) -> None:
+        if not self.frista_ready:
+            self._handle_error("Frista belum siap atau tidak sedang berjalan.")
+            self._emit_action("frista_close", False)
+            return
+
+        self._update_status("Menutup aplikasi Frista sesuai permintaan operator...")
+        try:
+            self.frista.close()
+        except Exception as exc:  # pragma: no cover - runtime interaction
+            self._handle_error(f"Gagal menutup Frista: {exc}")
+            self._emit_action("frista_close", False)
+            return
+
+        with self._lock:
+            self.frista_ready = False
+        self._notify_state()
+        self._update_status("Frista telah ditutup. Buka kembali jika ingin melanjutkan alur.")
+        self._emit_action("frista_close", True)
 
     # Helpers ---------------------------------------------------------
     def _notify_state(self) -> None:

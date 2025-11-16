@@ -111,6 +111,26 @@ def minimize_window(title: str) -> bool:
     return False
 
 
+def close_window(title: str) -> bool:
+    """Close a window by title."""
+
+    if not title or gw is None:
+        return False
+
+    windows = gw.getWindowsWithTitle(title)
+    for window in windows:
+        try:
+            if window.isMinimized:
+                window.restore()
+            window.activate()
+            time.sleep(0.1)
+            window.close()
+            return True
+        except Exception:
+            continue
+    return False
+
+
 def dismiss_popup_window(title: str, key: str = "enter", delay: float = 0.2) -> bool:
     """Activate a popup window and dismiss it using the provided key."""
 
@@ -141,4 +161,5 @@ __all__ = [
     "dismiss_popup",
     "dismiss_popup_window",
     "minimize_window",
+    "close_window",
 ]

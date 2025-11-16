@@ -37,7 +37,7 @@ class MainWindow:
         self._frista_busy = False
         self._after_busy = False
         self._scanner_busy = False
-        self._frista_focus_busy = False
+        self._frista_window_busy = False
 
         self._create_menubar()
         self._build_layout()
@@ -204,9 +204,8 @@ class MainWindow:
         tk.Label(
             face_frame,
             text=(
-                "Setelah pengambilan foto dan muncul popup hasil verifikasi wajah di Frista, gunakan tombol "
-                "di bawah untuk menutup popup tersebut, meminimalkan Frista, dan menampilkan aplikasi utama agar "
-                "operator bisa lanjut."
+                "Setelah pengambilan foto dan muncul popup hasil verifikasi wajah di Frista, gunakan tombol-tombol di "
+                "bawah untuk mengendalikan jendela Frista langsung dari aplikasi utama."
             ),
             wraplength=440,
             justify="left",
@@ -219,6 +218,23 @@ class MainWindow:
             command=self._on_finish_verification,
         )
         self.btn_finish_frista.pack(anchor="w")
+
+        frista_controls = tk.Frame(face_frame)
+        frista_controls.pack(anchor="w", pady=(8, 0))
+
+        self.btn_hide_frista = tk.Button(
+            frista_controls,
+            text="Sembunyikan Frista",
+            command=self._on_hide_frista,
+        )
+        self.btn_hide_frista.pack(side="left", padx=(0, 12))
+
+        self.btn_close_frista = tk.Button(
+            frista_controls,
+            text="Tutup Frista",
+            command=self._on_close_frista,
+        )
+        self.btn_close_frista.pack(side="left")
 
         # Status & controls
         status_frame = tk.Frame(self.root, padx=20, pady=12)
@@ -299,14 +315,14 @@ class MainWindow:
         self._frista_busy = False
         self._after_busy = False
         self._scanner_busy = False
-        self._frista_focus_busy = False
+        self._frista_window_busy = False
         self.input_mode_var.set("manual")
         self._update_input_mode()
         self.controller.reset()
         self._set_scan_button_state()
 
     def _on_finish_verification(self) -> None:
-        if self._frista_focus_busy:
+        if self._frista_window_busy:
             return
         if not self._latest_state.get("frista_ready", False):
             messagebox.showinfo(
@@ -315,10 +331,41 @@ class MainWindow:
             )
             return
 
-        self._frista_focus_busy = True
-        if hasattr(self, "btn_finish_frista"):
-            self.btn_finish_frista.config(state="disabled")
+        self._set_frista_window_busy(True)
         self.controller.finish_frista_async()
+
+    def _on_hide_frista(self) -> None:
+        if self._frista_window_busy:
+            return
+        if not self._latest_state.get("frista_ready", False):
+            messagebox.showinfo(
+                "Frista belum siap",
+                "Buka dan login Frista terlebih dahulu sebelum menyembunyikannya dari sini.",
+            )
+            return
+
+        self._set_frista_window_busy(True)
+        self.controller.hide_frista_async()
+
+    def _on_close_frista(self) -> None:
+        if self._frista_window_busy:
+            return
+        if not self._latest_state.get("frista_ready", False):
+            messagebox.showinfo(
+                "Frista belum siap",
+                "Tidak ada jendela Frista yang bisa ditutup dari aplikasi utama.",
+            )
+            return
+
+        confirmed = messagebox.askyesno(
+            "Tutup Frista?",
+            "Apakah Anda yakin ingin menutup Frista? Anda harus menjalankan login Frista lagi untuk melanjutkan alur.",
+        )
+        if not confirmed:
+            return
+
+        self._set_frista_window_busy(True)
+        self.controller.close_frista_async()
 
     # Callback handlers ------------------------------------------------
     def _update_status(self, message: str) -> None:
@@ -351,11 +398,7 @@ class MainWindow:
                 self.entry_bpjs.config(state="disabled")
                 self.btn_submit.config(state="disabled")
 
-            if hasattr(self, "btn_finish_frista"):
-                if frista_ready and not self._frista_focus_busy:
-                    self.btn_finish_frista.config(state="normal")
-                else:
-                    self.btn_finish_frista.config(state="disabled")
+            self._update_frista_window_buttons()
 
             self._set_scan_button_state()
 
@@ -383,11 +426,18 @@ class MainWindow:
                 if success:
                     messagebox.showinfo("Berhasil", "Nomor BPJS berhasil dikirim ke Frista dan After.")
             elif action == "frista_focus":
-                self._frista_focus_busy = False
-                if hasattr(self, "btn_finish_frista") and self._latest_state.get("frista_ready", False):
-                    self.btn_finish_frista.config(state="normal")
+                self._set_frista_window_busy(False)
                 if success:
                     self._focus_main_window()
+            elif action in {"frista_hide", "frista_close"}:
+                self._set_frista_window_busy(False)
+                if success:
+                    self._focus_main_window()
+                    if action == "frista_close":
+                        messagebox.showinfo(
+                            "Frista ditutup",
+                            "Frista berhasil ditutup. Jalankan kembali langkah pertama jika ingin membukanya lagi.",
+                        )
 
             if action in {"frista_login", "after_login"}:
                 self._update_button_states(self._latest_state)
@@ -454,6 +504,20 @@ class MainWindow:
         mode = self.input_mode_var.get()
         self.input_hint_var.set(hints.get(mode, hints["manual"]))
         self._set_scan_button_state()
+
+    def _set_frista_window_busy(self, busy: bool) -> None:
+        self._frista_window_busy = busy
+        self._update_frista_window_buttons()
+
+    def _update_frista_window_buttons(self) -> None:
+        if not hasattr(self, "btn_finish_frista"):
+            return
+        frista_ready = self._latest_state.get("frista_ready", False)
+        state = "normal" if frista_ready and not self._frista_window_busy else "disabled"
+        self.btn_finish_frista.config(state=state)
+        self.btn_hide_frista.config(state=state)
+        close_state = state if frista_ready else "disabled"
+        self.btn_close_frista.config(state=close_state)
 
     def _focus_main_window(self) -> None:
         def bring_to_front() -> None:

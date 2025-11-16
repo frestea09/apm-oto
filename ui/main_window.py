@@ -204,8 +204,9 @@ class MainWindow:
         tk.Label(
             face_frame,
             text=(
-                "Setelah pengambilan foto dan verifikasi wajah selesai di Frista, gunakan tombol di bawah "
-                "untuk meminimalkan Frista dan menampilkan aplikasi utama agar operator bisa lanjut."
+                "Setelah pengambilan foto dan muncul popup hasil verifikasi wajah di Frista, gunakan tombol "
+                "di bawah untuk menutup popup tersebut, meminimalkan Frista, dan menampilkan aplikasi utama agar "
+                "operator bisa lanjut."
             ),
             wraplength=440,
             justify="left",

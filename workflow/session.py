@@ -167,7 +167,18 @@ class SessionController:
             self._emit_action("frista_focus", False)
             return
 
-        self._update_status("Meminimalkan Frista dan menampilkan aplikasi utama...")
+        popup_closed = False
+        try:
+            popup_closed = self.frista.acknowledge_face_result()
+        except Exception:
+            popup_closed = False
+
+        if popup_closed:
+            self._update_status(
+                "Popup hasil verifikasi wajah ditutup. Meminimalkan Frista dan kembali ke aplikasi utama..."
+            )
+        else:
+            self._update_status("Meminimalkan Frista dan menampilkan aplikasi utama...")
         try:
             self.frista.minimize()
         except Exception as exc:  # pragma: no cover - runtime interaction

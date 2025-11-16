@@ -52,9 +52,19 @@ class MainWindow:
         main_menu.add_command(label="Buka After", command=self._on_login_after)
         main_menu.add_separator()
         main_menu.add_command(
-            label="Input Nomor Booking", command=lambda: self.entry_bpjs.focus_set() if hasattr(self, "entry_bpjs") else None
+            label="Input Nomor Booking",
+            command=lambda: self.entry_bpjs.focus_set() if hasattr(self, "entry_bpjs") else None,
         )
         menu_bar.add_cascade(label="Menu Utama", menu=main_menu)
+
+        frista_menu = tk.Menu(menu_bar, tearoff=0)
+        frista_menu.add_command(label="Selesai Verifikasi", command=self._on_finish_verification)
+        frista_menu.add_command(label="Sembunyikan Frista", command=self._on_hide_frista)
+        frista_menu.add_separator()
+        frista_menu.add_command(label="Tutup Frista", command=self._on_close_frista)
+        menu_bar.add_cascade(label="Kontrol Frista", menu=frista_menu)
+
+        self.frista_menu = frista_menu
         menu_bar.add_command(label="Reset Alur", command=self._on_reset)
         self.root.config(menu=menu_bar)
         self.menu_bar = menu_bar
@@ -205,7 +215,7 @@ class MainWindow:
             face_frame,
             text=(
                 "Setelah pengambilan foto dan muncul popup hasil verifikasi wajah di Frista, gunakan tombol-tombol di "
-                "bawah untuk mengendalikan jendela Frista langsung dari aplikasi utama."
+                "bawah atau menu \"Kontrol Frista\" di atas untuk mengendalikan jendela Frista langsung dari aplikasi utama."
             ),
             wraplength=440,
             justify="left",
@@ -399,6 +409,7 @@ class MainWindow:
                 self.btn_submit.config(state="disabled")
 
             self._update_frista_window_buttons()
+            self._update_menu_states()
 
             self._set_scan_button_state()
 
@@ -438,6 +449,7 @@ class MainWindow:
                             "Frista ditutup",
                             "Frista berhasil ditutup. Jalankan kembali langkah pertama jika ingin membukanya lagi.",
                         )
+            self._update_menu_states()
 
             if action in {"frista_login", "after_login"}:
                 self._update_button_states(self._latest_state)
@@ -508,6 +520,7 @@ class MainWindow:
     def _set_frista_window_busy(self, busy: bool) -> None:
         self._frista_window_busy = busy
         self._update_frista_window_buttons()
+        self._update_menu_states()
 
     def _update_frista_window_buttons(self) -> None:
         if not hasattr(self, "btn_finish_frista"):
@@ -518,6 +531,19 @@ class MainWindow:
         self.btn_hide_frista.config(state=state)
         close_state = state if frista_ready else "disabled"
         self.btn_close_frista.config(state=close_state)
+
+    def _update_menu_states(self) -> None:
+        if not hasattr(self, "frista_menu"):
+            return
+        frista_ready = self._latest_state.get("frista_ready", False)
+        state = "normal" if frista_ready and not self._frista_window_busy else "disabled"
+        try:
+            self.frista_menu.entryconfig("Selesai Verifikasi", state=state)
+            self.frista_menu.entryconfig("Sembunyikan Frista", state=state)
+            close_state = "normal" if frista_ready and not self._frista_window_busy else "disabled"
+            self.frista_menu.entryconfig("Tutup Frista", state=close_state)
+        except tk.TclError:
+            pass
 
     def _focus_main_window(self) -> None:
         def bring_to_front() -> None:

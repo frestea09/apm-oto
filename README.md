@@ -33,7 +33,8 @@ Langkah-langkah di bawah ini menggantikan konsep `npm install` pada proyek JavaS
    pip install -r requirements.txt
    ```
 
-   Perintah ini akan memasang `pyautogui` dan `pygetwindow` yang digunakan untuk mengontrol UI Frista dan After.
+   Perintah ini akan memasang `pyautogui`, `pygetwindow`, serta `opencv-python` dan `pyzbar` yang diperlukan untuk
+   fitur pemindaian barcode BPJS.
 
 ## Konfigurasi
 
@@ -42,7 +43,7 @@ Semua konfigurasi dasar berada di `config.conf`. Anda dapat mengubah lokasi exec
 - `FRISTA_PASSWORD`
 - `AFTER_PASSWORD`
 
-Pastikan jalur executable (`path`) sesuai dengan lokasi instalasi Frista dan After di mesin Anda. Jika aplikasi membutuhkan direktori kerja tertentu agar dapat berjalan (misalnya Frista berada di `D:\BPJS\Frista`), atur juga nilai `working_dir`. Contoh konfigurasi dapat dilihat di bagian `[Frista]` dan `[After]` pada berkas.
+Pastikan jalur executable (`path`) sesuai dengan lokasi instalasi Frista dan After di mesin Anda. Jika aplikasi membutuhkan direktori kerja tertentu agar dapat berjalan (misalnya Frista berada di `D:\BPJS\Frista`), atur juga nilai `working_dir`. Contoh konfigurasi dapat dilihat di bagian `[Frista]` dan `[After]` pada berkas. Untuk memanfaatkan pemindaian barcode, aktifkan bagian `[Scanner]`, sesuaikan `camera_id`, serta atur `scan_timeout` sesuai kebutuhan lapangan.
 
 ## Menjalankan Aplikasi
 
@@ -52,7 +53,7 @@ Setelah dependensi terpasang dan konfigurasi diatur, jalankan aplikasi dengan:
 python main.py
 ```
 
-Antarmuka Tkinter akan memandu Anda menjalankan automasi Frista terlebih dahulu, kemudian After, dan akhirnya memasukkan nomor BPJS sesuai urutan yang disarankan.
+Antarmuka Tkinter akan memandu Anda menjalankan automasi Frista terlebih dahulu, kemudian After, dan akhirnya memasukkan nomor BPJS sesuai urutan yang disarankan. Setelah kedua aplikasi siap, tekan tombol "Scan Barcode" bila ingin mengisi nomor secara otomatis menggunakan kamera. Arahkan kartu BPJS ke kamera hingga terbaca atau tekan `Q` untuk membatalkan pemindaian, lalu lanjutkan input manual jika diperlukan.
 
 ## Catatan Tambahan
 

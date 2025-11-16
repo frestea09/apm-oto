@@ -1,10 +1,12 @@
 """Tkinter user interface for guiding the Frista-first workflow."""
 from __future__ import annotations
 
+import threading
 import tkinter as tk
 from tkinter import messagebox
-from typing import Dict
+from typing import Dict, Optional
 
+from automation import BarcodeScanner, BarcodeScannerError
 from config.loader import Settings
 from workflow.session import SessionController
 
@@ -12,10 +14,17 @@ from workflow.session import SessionController
 class MainWindow:
     """UI bertahap yang memandu operator melewati alur Frista → After."""
 
-    def __init__(self, root: tk.Tk, controller: SessionController, settings: Settings) -> None:
+    def __init__(
+        self,
+        root: tk.Tk,
+        controller: SessionController,
+        settings: Settings,
+        scanner: Optional[BarcodeScanner] = None,
+    ) -> None:
         self.root = root
         self.controller = controller
         self.settings = settings
+        self.scanner = scanner
 
         self.status_var = tk.StringVar(value="Silakan mulai dengan login Frista.")
         self.bpjs_var = tk.StringVar()
@@ -23,6 +32,7 @@ class MainWindow:
         self._latest_state: Dict[str, bool] = {"frista_ready": False, "after_ready": False}
         self._frista_busy = False
         self._after_busy = False
+        self._scanner_busy = False
 
         self._build_layout()
         self._register_callbacks()
@@ -113,11 +123,14 @@ class MainWindow:
         entry_frame = tk.Frame(booking_frame)
         entry_frame.pack(fill="x", pady=8)
 
-        self.entry_bpjs = tk.Entry(entry_frame, textvariable=self.bpjs_var, width=36)
+        self.entry_bpjs = tk.Entry(entry_frame, textvariable=self.bpjs_var, width=32)
         self.entry_bpjs.pack(side="left", padx=(0, 12))
 
         self.btn_submit = tk.Button(entry_frame, text="Kirim ke Aplikasi", command=self._on_submit_booking)
-        self.btn_submit.pack(side="left")
+        self.btn_submit.pack(side="left", padx=(0, 8))
+
+        self.btn_scan = tk.Button(entry_frame, text="Scan Barcode", command=self._on_scan_barcode)
+        self.btn_scan.pack(side="left")
 
         camera_info = tk.Label(
             booking_frame,
@@ -129,6 +142,17 @@ class MainWindow:
             wraplength=440,
         )
         camera_info.pack(anchor="w", pady=(6, 0))
+
+        scan_hint = tk.Label(
+            booking_frame,
+            text=(
+                "Gunakan tombol 'Scan Barcode' jika scanner tersedia, atau isi nomor secara manual."
+            ),
+            justify="left",
+            wraplength=440,
+            fg="#0f62fe",
+        )
+        scan_hint.pack(anchor="w", pady=(4, 0))
 
         # Status & controls
         status_frame = tk.Frame(self.root, padx=20, pady=12)
@@ -142,6 +166,8 @@ class MainWindow:
 
         self.btn_reset = tk.Button(control_frame, text="Reset Alur", command=self._on_reset)
         self.btn_reset.pack(side="left")
+
+        self._set_scan_button_state()
 
     # Callback registration -------------------------------------------
     def _register_callbacks(self) -> None:
@@ -175,12 +201,34 @@ class MainWindow:
         self.btn_submit.config(state="disabled")
         self.controller.submit_booking_async(nomor)
 
+    def _on_scan_barcode(self) -> None:
+        if not self.scanner:
+            messagebox.showinfo(
+                "Scanner belum dikonfigurasi",
+                "Aktifkan bagian [Scanner] pada config.conf untuk menggunakan fitur ini.",
+            )
+            return
+        if not self.scanner.is_available:
+            messagebox.showerror("Scanner tidak siap", self.scanner.unavailable_reason or "Scanner tidak tersedia.")
+            return
+        if self._scanner_busy:
+            return
+
+        self._scanner_busy = True
+        self._set_scan_button_state()
+        self._update_status("Mempersiapkan kamera barcode...")
+
+        thread = threading.Thread(target=self._scan_barcode_task, daemon=True)
+        thread.start()
+
     def _on_reset(self) -> None:
         self.bpjs_var.set("")
         self.entry_bpjs.delete(0, tk.END)
         self._frista_busy = False
         self._after_busy = False
+        self._scanner_busy = False
         self.controller.reset()
+        self._set_scan_button_state()
 
     # Callback handlers ------------------------------------------------
     def _update_status(self, message: str) -> None:
@@ -213,6 +261,8 @@ class MainWindow:
                 self.entry_bpjs.config(state="disabled")
                 self.btn_submit.config(state="disabled")
 
+            self._set_scan_button_state()
+
         self.root.after(0, apply_state)
 
     def _show_error(self, message: str) -> None:
@@ -241,6 +291,49 @@ class MainWindow:
                 self._update_button_states(self._latest_state)
 
         self.root.after(0, update_controls)
+
+    # Barcode helpers --------------------------------------------------
+    def _scan_barcode_task(self) -> None:
+        assert self.scanner is not None
+        try:
+            nomor = self.scanner.scan()
+        except BarcodeScannerError as exc:
+            self._handle_scan_failure(str(exc))
+            return
+        self._handle_scan_success(nomor)
+
+    def _handle_scan_success(self, nomor: str) -> None:
+        def update_entry() -> None:
+            self._scanner_busy = False
+            self.bpjs_var.set(nomor)
+            self.entry_bpjs.config(state="normal")
+            self.entry_bpjs.focus_set()
+            self.entry_bpjs.selection_range(0, tk.END)
+            self._update_status("Barcode terbaca. Periksa nomor sebelum dikirim.")
+            self._set_scan_button_state()
+
+        self.root.after(0, update_entry)
+
+    def _handle_scan_failure(self, message: str) -> None:
+        def show_failure() -> None:
+            self._scanner_busy = False
+            messagebox.showerror("Gagal memindai barcode", message)
+            self._update_status("Pemindaian gagal. Coba ulangi atau isi manual.")
+            self._set_scan_button_state()
+
+        self.root.after(0, show_failure)
+
+    def _set_scan_button_state(self) -> None:
+        if not hasattr(self, "btn_scan"):
+            return
+        ready = self._latest_state.get("frista_ready", False) and self._latest_state.get("after_ready", False)
+        if not ready or self._scanner_busy:
+            state = "disabled"
+        elif not self.scanner or not self.scanner.is_available:
+            state = "disabled"
+        else:
+            state = "normal"
+        self.btn_scan.config(state=state)
 
 
 __all__ = ["MainWindow"]

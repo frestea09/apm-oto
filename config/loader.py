@@ -77,6 +77,26 @@ def _read_float(
     return float(value)
 
 
+def _read_bool(
+    parser: ConfigParser,
+    section: str,
+    option: str,
+    fallback: Optional[bool] = None,
+    env_key: Optional[str] = None,
+) -> bool:
+    value = _read_optional(parser, section, option, env_key=env_key)
+    if value is None:
+        if fallback is None:
+            raise KeyError(f"Konfigurasi boolean '{section}.{option}' tidak ditemukan dan tidak memiliki default")
+        return fallback
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"Nilai boolean tidak valid untuk {section}.{option}: {value}")
+
+
 @dataclass
 class ApplicationSettings:
     """Konfigurasi untuk aplikasi eksternal seperti Frista atau After."""
@@ -97,6 +117,14 @@ class CameraSettings:
 
 
 @dataclass
+class ScannerSettings:
+    enabled: bool
+    camera_id: int
+    scan_timeout: float
+    window_title: str
+
+
+@dataclass
 class WorkflowSettings:
     post_login_delay: float
     network_timeout: float
@@ -107,6 +135,7 @@ class Settings:
     frista: ApplicationSettings
     after: ApplicationSettings
     camera: CameraSettings
+    scanner: ScannerSettings
     workflow: WorkflowSettings
 
 
@@ -163,6 +192,23 @@ def load_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Settings:
         api=_read_value(parser, "Camera", "api", fallback="https://frista.bpjs-kesehatan.go.id/frista-api"),
     )
 
+    scanner_settings = ScannerSettings(
+        enabled=_read_bool(parser, "Scanner", "enabled", fallback=False),
+        camera_id=_read_int(
+            parser,
+            "Scanner",
+            "camera_id",
+            fallback=camera_settings.camera_id,
+        ),
+        scan_timeout=_read_float(parser, "Scanner", "scan_timeout", fallback=12.0),
+        window_title=_read_value(
+            parser,
+            "Scanner",
+            "window_title",
+            fallback="Pemindai Barcode BPJS",
+        ),
+    )
+
     workflow_settings = WorkflowSettings(
         post_login_delay=_read_float(parser, "Workflow", "post_login_delay", fallback=1.0),
         network_timeout=_read_float(parser, "Workflow", "network_timeout", fallback=5.0),
@@ -172,6 +218,7 @@ def load_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Settings:
         frista=frista_settings,
         after=after_settings,
         camera=camera_settings,
+        scanner=scanner_settings,
         workflow=workflow_settings,
     )
 
@@ -179,6 +226,7 @@ def load_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Settings:
 __all__ = [
     "ApplicationSettings",
     "CameraSettings",
+    "ScannerSettings",
     "WorkflowSettings",
     "Settings",
     "load_config",

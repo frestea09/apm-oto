@@ -28,20 +28,50 @@ class MainWindow:
 
         self.status_var = tk.StringVar(value="Silakan mulai dengan login Frista.")
         self.bpjs_var = tk.StringVar()
+        self.input_mode_var = tk.StringVar(value="manual")
+        self.input_hint_var = tk.StringVar(
+            value="Masukkan nomor booking secara manual jika scanner belum siap."
+        )
 
         self._latest_state: Dict[str, bool] = {"frista_ready": False, "after_ready": False}
         self._frista_busy = False
         self._after_busy = False
         self._scanner_busy = False
+        self._frista_window_busy = False
 
+        self._create_menubar()
         self._build_layout()
         self._register_callbacks()
         self._update_button_states({"frista_ready": False, "after_ready": False})
 
     # UI construction -------------------------------------------------
+    def _create_menubar(self) -> None:
+        menu_bar = tk.Menu(self.root)
+        main_menu = tk.Menu(menu_bar, tearoff=0)
+        main_menu.add_command(label="Buka Frista", command=self._on_login_frista)
+        main_menu.add_command(label="Buka After", command=self._on_login_after)
+        main_menu.add_separator()
+        main_menu.add_command(
+            label="Input Nomor Booking",
+            command=lambda: self.entry_bpjs.focus_set() if hasattr(self, "entry_bpjs") else None,
+        )
+        menu_bar.add_cascade(label="Menu Utama", menu=main_menu)
+
+        frista_menu = tk.Menu(menu_bar, tearoff=0)
+        frista_menu.add_command(label="Selesai Verifikasi", command=self._on_finish_verification)
+        frista_menu.add_command(label="Sembunyikan Frista", command=self._on_hide_frista)
+        frista_menu.add_separator()
+        frista_menu.add_command(label="Tutup Frista", command=self._on_close_frista)
+        menu_bar.add_cascade(label="Kontrol Frista", menu=frista_menu)
+
+        self.frista_menu = frista_menu
+        menu_bar.add_command(label="Reset Alur", command=self._on_reset)
+        self.root.config(menu=menu_bar)
+        self.menu_bar = menu_bar
+
     def _build_layout(self) -> None:
         self.root.title("APM BPJS - Otomasi Frista & After")
-        self.root.geometry("520x420")
+        self.root.geometry("560x640")
         self.root.resizable(False, False)
 
         header = tk.Label(
@@ -120,6 +150,26 @@ class MainWindow:
             text="Masukkan nomor BPJS/NIK setelah kedua aplikasi siap.",
         ).pack(anchor="w")
 
+        mode_frame = tk.Frame(booking_frame)
+        mode_frame.pack(fill="x", pady=(8, 4))
+        tk.Label(mode_frame, text="Sumber nomor booking:").pack(anchor="w")
+
+        modes = [
+            ("Manual", "manual"),
+            ("Webcam Laptop", "webcam"),
+            ("Scanner/Kamera Eksternal", "scanner"),
+        ]
+        radio_frame = tk.Frame(mode_frame)
+        radio_frame.pack(anchor="w", pady=(4, 0))
+        for label, value in modes:
+            tk.Radiobutton(
+                radio_frame,
+                text=label,
+                value=value,
+                variable=self.input_mode_var,
+                command=self._update_input_mode,
+            ).pack(side="left", padx=(0, 12))
+
         entry_frame = tk.Frame(booking_frame)
         entry_frame.pack(fill="x", pady=8)
 
@@ -132,6 +182,15 @@ class MainWindow:
         self.btn_scan = tk.Button(entry_frame, text="Scan Barcode", command=self._on_scan_barcode)
         self.btn_scan.pack(side="left")
 
+        hint_label = tk.Label(
+            booking_frame,
+            textvariable=self.input_hint_var,
+            justify="left",
+            wraplength=460,
+            fg="#0f62fe",
+        )
+        hint_label.pack(anchor="w", pady=(0, 6))
+
         camera_info = tk.Label(
             booking_frame,
             text=(
@@ -143,16 +202,49 @@ class MainWindow:
         )
         camera_info.pack(anchor="w", pady=(6, 0))
 
-        scan_hint = tk.Label(
-            booking_frame,
-            text=(
-                "Gunakan tombol 'Scan Barcode' jika scanner tersedia, atau isi nomor secara manual."
-            ),
-            justify="left",
-            wraplength=440,
-            fg="#0f62fe",
+        # Step 4 - Face verification reminder
+        face_frame = tk.LabelFrame(
+            self.root,
+            text="Langkah 4 - Verifikasi Wajah & Kembali ke Menu",
+            padx=12,
+            pady=12,
         )
-        scan_hint.pack(anchor="w", pady=(4, 0))
+        face_frame.pack(fill="x", padx=20, pady=6)
+
+        tk.Label(
+            face_frame,
+            text=(
+                "Setelah pengambilan foto dan muncul popup hasil verifikasi wajah di Frista, gunakan tombol-tombol di "
+                "bawah atau menu \"Kontrol Frista\" di atas untuk mengendalikan jendela Frista langsung dari aplikasi utama."
+            ),
+            wraplength=440,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 8))
+
+        self.btn_finish_frista = tk.Button(
+            face_frame,
+            text="Selesai Verifikasi di Frista",
+            width=26,
+            command=self._on_finish_verification,
+        )
+        self.btn_finish_frista.pack(anchor="w")
+
+        frista_controls = tk.Frame(face_frame)
+        frista_controls.pack(anchor="w", pady=(8, 0))
+
+        self.btn_hide_frista = tk.Button(
+            frista_controls,
+            text="Sembunyikan Frista",
+            command=self._on_hide_frista,
+        )
+        self.btn_hide_frista.pack(side="left", padx=(0, 12))
+
+        self.btn_close_frista = tk.Button(
+            frista_controls,
+            text="Tutup Frista",
+            command=self._on_close_frista,
+        )
+        self.btn_close_frista.pack(side="left")
 
         # Status & controls
         status_frame = tk.Frame(self.root, padx=20, pady=12)
@@ -216,7 +308,13 @@ class MainWindow:
 
         self._scanner_busy = True
         self._set_scan_button_state()
-        self._update_status("Mempersiapkan kamera barcode...")
+        mode = self.input_mode_var.get()
+        if mode == "webcam":
+            self._update_status("Mempersiapkan webcam laptop untuk membaca kartu peserta...")
+        elif mode == "scanner":
+            self._update_status("Mempersiapkan scanner atau kamera eksternal...")
+        else:
+            self._update_status("Mempersiapkan kamera barcode...")
 
         thread = threading.Thread(target=self._scan_barcode_task, daemon=True)
         thread.start()
@@ -227,8 +325,57 @@ class MainWindow:
         self._frista_busy = False
         self._after_busy = False
         self._scanner_busy = False
+        self._frista_window_busy = False
+        self.input_mode_var.set("manual")
+        self._update_input_mode()
         self.controller.reset()
         self._set_scan_button_state()
+
+    def _on_finish_verification(self) -> None:
+        if self._frista_window_busy:
+            return
+        if not self._latest_state.get("frista_ready", False):
+            messagebox.showinfo(
+                "Frista belum siap",
+                "Buka dan login Frista terlebih dahulu sebelum menutupnya dari sini.",
+            )
+            return
+
+        self._set_frista_window_busy(True)
+        self.controller.finish_frista_async()
+
+    def _on_hide_frista(self) -> None:
+        if self._frista_window_busy:
+            return
+        if not self._latest_state.get("frista_ready", False):
+            messagebox.showinfo(
+                "Frista belum siap",
+                "Buka dan login Frista terlebih dahulu sebelum menyembunyikannya dari sini.",
+            )
+            return
+
+        self._set_frista_window_busy(True)
+        self.controller.hide_frista_async()
+
+    def _on_close_frista(self) -> None:
+        if self._frista_window_busy:
+            return
+        if not self._latest_state.get("frista_ready", False):
+            messagebox.showinfo(
+                "Frista belum siap",
+                "Tidak ada jendela Frista yang bisa ditutup dari aplikasi utama.",
+            )
+            return
+
+        confirmed = messagebox.askyesno(
+            "Tutup Frista?",
+            "Apakah Anda yakin ingin menutup Frista? Anda harus menjalankan login Frista lagi untuk melanjutkan alur.",
+        )
+        if not confirmed:
+            return
+
+        self._set_frista_window_busy(True)
+        self.controller.close_frista_async()
 
     # Callback handlers ------------------------------------------------
     def _update_status(self, message: str) -> None:
@@ -261,6 +408,9 @@ class MainWindow:
                 self.entry_bpjs.config(state="disabled")
                 self.btn_submit.config(state="disabled")
 
+            self._update_frista_window_buttons()
+            self._update_menu_states()
+
             self._set_scan_button_state()
 
         self.root.after(0, apply_state)
@@ -286,6 +436,20 @@ class MainWindow:
                 self.btn_submit.config(state="normal")
                 if success:
                     messagebox.showinfo("Berhasil", "Nomor BPJS berhasil dikirim ke Frista dan After.")
+            elif action == "frista_focus":
+                self._set_frista_window_busy(False)
+                if success:
+                    self._focus_main_window()
+            elif action in {"frista_hide", "frista_close"}:
+                self._set_frista_window_busy(False)
+                if success:
+                    self._focus_main_window()
+                    if action == "frista_close":
+                        messagebox.showinfo(
+                            "Frista ditutup",
+                            "Frista berhasil ditutup. Jalankan kembali langkah pertama jika ingin membukanya lagi.",
+                        )
+            self._update_menu_states()
 
             if action in {"frista_login", "after_login"}:
                 self._update_button_states(self._latest_state)
@@ -327,13 +491,75 @@ class MainWindow:
         if not hasattr(self, "btn_scan"):
             return
         ready = self._latest_state.get("frista_ready", False) and self._latest_state.get("after_ready", False)
-        if not ready or self._scanner_busy:
+        mode = self.input_mode_var.get()
+        label_map = {
+            "manual": "Scan Barcode",
+            "webcam": "Ambil dari Webcam",
+            "scanner": "Scan dari Scanner",
+        }
+        if mode == "manual":
+            state = "disabled"
+        elif not ready or self._scanner_busy:
             state = "disabled"
         elif not self.scanner or not self.scanner.is_available:
             state = "disabled"
         else:
             state = "normal"
-        self.btn_scan.config(state=state)
+        self.btn_scan.config(state=state, text=label_map.get(mode, "Scan Barcode"))
+
+    def _update_input_mode(self) -> None:
+        hints = {
+            "manual": "Masukkan nomor booking secara manual jika scanner belum siap.",
+            "webcam": "Arahkan kartu BPJS ke webcam laptop lalu klik 'Ambil dari Webcam' untuk membaca barcode.",
+            "scanner": "Gunakan kamera eksternal atau scanner barcode, lalu tekan tombol pemindaian saat kartu sudah siap.",
+        }
+        mode = self.input_mode_var.get()
+        self.input_hint_var.set(hints.get(mode, hints["manual"]))
+        self._set_scan_button_state()
+
+    def _set_frista_window_busy(self, busy: bool) -> None:
+        self._frista_window_busy = busy
+        self._update_frista_window_buttons()
+        self._update_menu_states()
+
+    def _update_frista_window_buttons(self) -> None:
+        if not hasattr(self, "btn_finish_frista"):
+            return
+        frista_ready = self._latest_state.get("frista_ready", False)
+        state = "normal" if frista_ready and not self._frista_window_busy else "disabled"
+        self.btn_finish_frista.config(state=state)
+        self.btn_hide_frista.config(state=state)
+        close_state = state if frista_ready else "disabled"
+        self.btn_close_frista.config(state=close_state)
+
+    def _update_menu_states(self) -> None:
+        if not hasattr(self, "frista_menu"):
+            return
+        frista_ready = self._latest_state.get("frista_ready", False)
+        state = "normal" if frista_ready and not self._frista_window_busy else "disabled"
+        try:
+            self.frista_menu.entryconfig("Selesai Verifikasi", state=state)
+            self.frista_menu.entryconfig("Sembunyikan Frista", state=state)
+            close_state = "normal" if frista_ready and not self._frista_window_busy else "disabled"
+            self.frista_menu.entryconfig("Tutup Frista", state=close_state)
+        except tk.TclError:
+            pass
+
+    def _focus_main_window(self) -> None:
+        def bring_to_front() -> None:
+            try:
+                self.root.deiconify()
+            except tk.TclError:
+                pass
+            self.root.lift()
+            self.root.focus_force()
+            try:
+                self.root.attributes("-topmost", True)
+                self.root.after(600, lambda: self.root.attributes("-topmost", False))
+            except tk.TclError:
+                pass
+
+        self.root.after(0, bring_to_front)
 
 
 __all__ = ["MainWindow"]

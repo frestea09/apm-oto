@@ -10,6 +10,9 @@ from config.loader import ApplicationSettings
 from . import utils
 
 
+FACE_RESULT_WINDOW_TITLE = "Hasil Pengenalan Wajah"
+
+
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0.1
 
@@ -44,6 +47,30 @@ class FristaClient:
     def dismiss_warning(self) -> None:
         """Dismiss error popup using space as Frista's confirmation key."""
         utils.dismiss_popup("space")
+
+    def acknowledge_face_result(self) -> bool:
+        """Try to close the face verification result popup if it appears."""
+
+        handled = utils.dismiss_popup_window(FACE_RESULT_WINDOW_TITLE, key="enter")
+        if handled:
+            time.sleep(0.2)
+        return handled
+
+    def minimize(self) -> None:
+        """Minimize the Frista window so the operator can focus on APM UI."""
+
+        if not utils.minimize_window(self.settings.window_title):
+            raise RuntimeError(
+                "Tidak dapat meminimalkan jendela Frista. Pastikan Frista sedang berjalan."
+            )
+
+    def close(self) -> None:
+        """Close the Frista window entirely."""
+
+        if not utils.close_window(self.settings.window_title):
+            raise RuntimeError(
+                "Tidak dapat menutup jendela Frista. Pastikan aplikasinya sedang terbuka."
+            )
 
 
 __all__ = ["FristaClient"]

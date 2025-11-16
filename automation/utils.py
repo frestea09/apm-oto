@@ -94,6 +94,64 @@ def dismiss_popup(key: str, delay: float = 0.2) -> None:
         time.sleep(delay)
 
 
+def minimize_window(title: str) -> bool:
+    """Minimize a window by title if supported by the system."""
+
+    if not title or gw is None:
+        return False
+
+    windows = gw.getWindowsWithTitle(title)
+    for window in windows:
+        try:
+            if not window.isMinimized:
+                window.minimize()
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def close_window(title: str) -> bool:
+    """Close a window by title."""
+
+    if not title or gw is None:
+        return False
+
+    windows = gw.getWindowsWithTitle(title)
+    for window in windows:
+        try:
+            if window.isMinimized:
+                window.restore()
+            window.activate()
+            time.sleep(0.1)
+            window.close()
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def dismiss_popup_window(title: str, key: str = "enter", delay: float = 0.2) -> bool:
+    """Activate a popup window and dismiss it using the provided key."""
+
+    if not title or gw is None:
+        return False
+
+    windows = gw.getWindowsWithTitle(title)
+    for window in windows:
+        try:
+            window.activate()
+        except Exception:
+            continue
+
+        try:
+            dismiss_popup(key, delay)
+        except RuntimeError:
+            return False
+        return True
+    return False
+
+
 __all__ = [
     "NetworkUnavailableError",
     "ensure_internet_connection",
@@ -101,4 +159,7 @@ __all__ = [
     "focus_window",
     "ensure_window_focus",
     "dismiss_popup",
+    "dismiss_popup_window",
+    "minimize_window",
+    "close_window",
 ]

@@ -94,6 +94,23 @@ def dismiss_popup(key: str, delay: float = 0.2) -> None:
         time.sleep(delay)
 
 
+def minimize_window(title: str) -> bool:
+    """Minimize a window by title if supported by the system."""
+
+    if not title or gw is None:
+        return False
+
+    windows = gw.getWindowsWithTitle(title)
+    for window in windows:
+        try:
+            if not window.isMinimized:
+                window.minimize()
+            return True
+        except Exception:
+            continue
+    return False
+
+
 __all__ = [
     "NetworkUnavailableError",
     "ensure_internet_connection",
@@ -101,4 +118,5 @@ __all__ = [
     "focus_window",
     "ensure_window_focus",
     "dismiss_popup",
+    "minimize_window",
 ]

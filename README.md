@@ -55,6 +55,8 @@ python main.py
 
 Antarmuka Tkinter akan memandu Anda menjalankan automasi Frista terlebih dahulu, kemudian After, dan akhirnya memasukkan nomor BPJS sesuai urutan yang disarankan. Setelah kedua aplikasi siap, tekan tombol "Scan Barcode" bila ingin mengisi nomor secara otomatis menggunakan kamera. Arahkan kartu BPJS ke kamera hingga terbaca atau tekan `Q` untuk membatalkan pemindaian, lalu lanjutkan input manual jika diperlukan.
 
+Menu utama di bagian atas menyediakan akses cepat untuk membuka Frista, After, maupun langsung memfokuskan kolom nomor booking. Setelah proses verifikasi wajah di Frista selesai, gunakan tombol "Selesai Verifikasi di Frista" pada langkah keempat agar aplikasi Frista diminimalkan secara otomatis dan antarmuka APM kembali ke posisi paling depan. Pilihan sumber input nomor booking kini tersedia (manual, webcam laptop, atau scanner eksternal) sehingga petugas dapat menyesuaikan perangkat yang digunakan di lapangan.
+
 ## Catatan Tambahan
 
 - Automasi bergantung pada judul jendela dan tata letak aplikasi bawaan. Jika Frista atau After diperbarui, Anda mungkin perlu menyesuaikan pengaturan `window_title` atau alur login.

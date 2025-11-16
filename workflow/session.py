@@ -69,6 +69,10 @@ class SessionController:
         )
         thread.start()
 
+    def finish_frista_async(self) -> None:
+        thread = threading.Thread(target=self._finish_frista_task, daemon=True)
+        thread.start()
+
     def reset(self) -> None:
         with self._lock:
             self.frista_ready = False
@@ -156,6 +160,23 @@ class SessionController:
 
         self._update_status("Nomor BPJS berhasil dikirim ke kedua aplikasi.")
         self._emit_action("submit_booking", True)
+
+    def _finish_frista_task(self) -> None:
+        if not self.frista_ready:
+            self._handle_error("Frista belum siap atau belum dibuka.")
+            self._emit_action("frista_focus", False)
+            return
+
+        self._update_status("Meminimalkan Frista dan menampilkan aplikasi utama...")
+        try:
+            self.frista.minimize()
+        except Exception as exc:  # pragma: no cover - runtime interaction
+            self._handle_error(f"Gagal meminimalkan Frista: {exc}")
+            self._emit_action("frista_focus", False)
+            return
+
+        self._update_status("Frista diminimalkan. Lanjutkan proses di aplikasi utama.")
+        self._emit_action("frista_focus", True)
 
     # Helpers ---------------------------------------------------------
     def _notify_state(self) -> None:

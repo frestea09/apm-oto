@@ -45,5 +45,13 @@ class FristaClient:
         """Dismiss error popup using space as Frista's confirmation key."""
         utils.dismiss_popup("space")
 
+    def minimize(self) -> None:
+        """Minimize the Frista window so the operator can focus on APM UI."""
+
+        if not utils.minimize_window(self.settings.window_title):
+            raise RuntimeError(
+                "Tidak dapat meminimalkan jendela Frista. Pastikan Frista sedang berjalan."
+            )
+
 
 __all__ = ["FristaClient"]
